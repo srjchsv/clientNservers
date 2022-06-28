@@ -3,26 +3,27 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"os/exec"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 var (
-	wg         sync.WaitGroup
 	serverFile = "ports.txt"
+	log        = logrus.New()
 )
 
 func echo(c net.Conn, timezone string) {
 	// Тут надо реализовать бесконечный цикл который будет писать в конект время в нужной часовой зоне каждую секунду
 	loc, err := time.LoadLocation(timezone)
 	if err != nil {
-		panic(err)
+		log.Error(err)
+		return
 	}
 	for {
 		t := time.Now().In(loc)
@@ -32,6 +33,7 @@ func echo(c net.Conn, timezone string) {
 }
 
 func main() {
+	log.Out = os.Stdout
 	address, timezone := generateServer()
 	closeHandle(address)
 	server(address, timezone)
@@ -42,17 +44,18 @@ func main() {
 func server(address, timezone string) {
 	// нужно вынести в настройки порт и часовой пояс
 	listener, err := net.Listen("tcp", address)
-	fmt.Println(listener.Addr().String())
+	log.Infof("Address: %v Timezone: %v", listener.Addr().String(), timezone)
 	defer listener.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return
 	}
 	for {
 		conn, err := listener.Accept()
 
 		if err != nil {
-			log.Print(err)
-			continue
+			log.Error(err)
+			return
 		}
 		go echo(conn, timezone)
 	}
@@ -67,11 +70,13 @@ func generateServer() (address, timezone string) {
 
 	file, err := os.OpenFile(serverFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 	defer file.Close()
 	if _, err := file.WriteString(timezone + " " + address + "\n"); err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 
 	return
@@ -83,7 +88,7 @@ func closeHandle(address string) {
 	go func() {
 		<-c
 		deleteServer(address)
-		fmt.Println("Shutting down server...")
+		log.Info("Shutting down server...")
 		os.Exit(0)
 	}()
 }
@@ -93,7 +98,8 @@ func deleteServer(address string) {
 	cmd := exec.Command("bash", "-c", str)
 	stdout, err := cmd.Output()
 	if err != nil {
-		log.Println(err)
+		log.Error(err)
+		return
 	}
 	fmt.Println(string(stdout))
 }
