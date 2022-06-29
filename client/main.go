@@ -35,10 +35,9 @@ func main() {
 		}(port)
 	}
 
-	for read := range fanninTime {
-		hr, min, sec := read.Clock()
-		log.Infof("Server: %v Time: %v:%v:%v Timezone: %v\n", <-addressCh, hr, min, sec, read.Location())
-
+	for in := range fanninTime {
+		hr, min, sec := in.Clock()
+		log.Infof("Server: %v Time: %v:%v:%v Timezone: %v\n", <-addressCh, hr, min, sec, in.Location())
 	}
 
 }
@@ -75,7 +74,7 @@ func client(address string) <-chan time.Time {
 func ports() []string {
 	var ports []string
 
-	portsPtr := flag.String("p", "ports.txt", "ports addresses")
+	portsPtr := flag.String("f", "ports.txt", "file contains ports addresses")
 	flag.Parse()
 	portsFile := *portsPtr
 
